@@ -160,6 +160,33 @@ def create_alien():
     
     return alien_surface
 
+def create_vegeta_ship():
+    # Create a surface for Vegeta's ship (64x64 pixels)
+    ship_surface = pygame.Surface((64, 64))
+    ship_surface.fill((0, 0, 0))  # Fill with black for transparency
+    ship_surface.set_colorkey((0, 0, 0))  # Make black transparent
+
+    # Draw ship body (blue armor color)
+    pygame.draw.polygon(ship_surface, (0, 0, 255), [
+        (32, 10),   # Top point
+        (10, 54),   # Bottom left
+        (54, 54)    # Bottom right
+    ])
+    
+    # Draw spiky hair (black)
+    spikes = [
+        [(32, 10), (25, 0), (32, 15)],   # Left spike
+        [(32, 10), (32, 0), (32, 15)],   # Middle spike
+        [(32, 10), (39, 0), (32, 15)],   # Right spike
+    ]
+    for spike in spikes:
+        pygame.draw.polygon(ship_surface, (30, 30, 30), spike)
+    
+    # Add armor details (white)
+    pygame.draw.rect(ship_surface, (255, 255, 255), (24, 40, 16, 4))
+    
+    return ship_surface
+
 def main():
     pygame.init()
     
@@ -176,6 +203,10 @@ def main():
     pygame.image.save(ship_ssj2, 'images/ship_ssj2.bmp')
     pygame.image.save(ship_ssj3, 'images/ship_ssj3.bmp')
     pygame.image.save(alien, 'images/alien.bmp')
+    
+    # Create and save Vegeta's ship
+    vegeta_ship = create_vegeta_ship()
+    pygame.image.save(vegeta_ship, 'images/vegeta_ship.bmp')
     
     pygame.quit()
 

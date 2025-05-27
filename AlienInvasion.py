@@ -129,6 +129,15 @@ class AlienInvasion:
         if pygame.sprite.spritecollideany(self.ship, self.aliens):
             self._ship_hit()
 
+        # Look for alien-ally collisions.
+        if self.ally_ship and pygame.sprite.spritecollideany(self.ally_ship, self.aliens):
+            destroyed = self.ally_ship.take_hit()
+            if destroyed:
+                self.ally_ship = None
+                self.settings.ally_active = False
+                self.settings.ally_spawned = False
+                # Optionally play a sound or show an effect here
+
         # Look for aliens hitting the bottom of the screen.
         self._check_aliens_bottom()
 
@@ -183,26 +192,7 @@ class AlienInvasion:
             sys.exit()
         elif event.key == pygame.K_SPACE:
             if not self.stats.game_active:
-                # If game over, restart game
-                self.stats.reset_stats()
-                self.sb.prep_score()
-                self.sb.prep_level()
-                self.sb.prep_power_level()
-                self.sb.prep_ships()
-                self._create_fleet()
-                self.ship.center_ship()
-                self.ally_ship = None  # Reset ally ship
-                self.power_ups.empty()
-                self.aliens.empty()
-                self.bullets.empty()
-                self.ally_bullets.empty()
-                self.explosions.empty()
-                self.stars.empty()
-                self._create_stars()
-                self.settings.power_up_spawned = False
-                self.settings.ally_spawned = False
-                self.stats.game_active = True
-                pygame.mouse.set_visible(False)
+                self._reset_game()
             else:
                 self._fire_bullet()
 
@@ -214,12 +204,18 @@ class AlienInvasion:
             self.ship.moving_left = False
 
     def _fire_bullet(self):
-        """Create a new bullet and add it to the bullets group"""
+        """Create a new bullet and add it to the bullets group. Ally fires in tandem if present."""
         if len(self.bullets) < self.settings.bullets_allowed:
             new_bullet = Bullet(self, self.ship)
             self.bullets.add(new_bullet)
             self.sounds.play_ki_blast()
             self.stats.bullets_fired += 1
+            # Ally fires in tandem
+            if self.ally_ship:
+                if len(self.ally_bullets) < self.settings.bullets_allowed:
+                    new_ally_bullet = Bullet(self, self.ally_ship)
+                    self.ally_bullets.add(new_ally_bullet)
+                    self.sounds.play_laser()
 
     def _update_bullets(self):
         """Update position of bullets and get rid of old bullets."""
@@ -236,17 +232,22 @@ class AlienInvasion:
             if bullet.rect.bottom <= 0:
                 self.ally_bullets.remove(bullet)
 
+        # Check for collisions with aliens
         self._check_bullet_alien_collisions()
         self._check_bullet_power_up_collisions()
 
     def _check_bullet_alien_collisions(self):
         """Respond to bullet-alien collisions."""
+        # Check player bullet collisions
         collisions = pygame.sprite.groupcollide(
                 self.bullets, self.aliens, True, True)
+        
+        # Check ally bullet collisions
         ally_collisions = pygame.sprite.groupcollide(
                 self.ally_bullets, self.aliens, True, True)
         
         if collisions or ally_collisions:
+            # Handle player bullet collisions
             for aliens in collisions.values():
                 for alien in aliens:
                     # Create explosion at alien's position
@@ -261,11 +262,28 @@ class AlienInvasion:
                 # Check for power-up and ally thresholds
                 self._check_power_up_threshold()
                 self._check_ally_threshold()
+                
+            # Handle ally bullet collisions
+            for aliens in ally_collisions.values():
+                for alien in aliens:
+                    # Create explosion at alien's position
+                    explosion = Explosion(self, alien.rect.center, 'small')
+                    self.explosions.add(explosion)
+                self.stats.score += self.settings.alien_points * len(aliens)
+                self.stats.power_level = self.stats.score
+                self.ship.transform(self.stats.power_level)
+                self.sounds.play_explosion()
+                # Track hits for accuracy
+                self.stats.register_hits(len(aliens))
+                # Check for power-up and ally thresholds
+                self._check_power_up_threshold()
+                self._check_ally_threshold()
+                
             self.sb.prep_score()
             self.sb.prep_level()
             self.sb.prep_power_level()
             self.sb.check_high_score()
-            
+
     def _check_power_up_threshold(self):
         """Check if score has reached power-up threshold."""
         if (self.stats.score >= self.settings.power_up_threshold and 
@@ -330,21 +348,40 @@ class AlienInvasion:
 
     def _activate_power_up(self, power_up_type):
         """Activate a power-up effect."""
+        print(f"Activating power-up: {power_up_type}")
         self.settings.power_up_active = True
         self.settings.power_up_type = power_up_type
         self.settings.power_up_start_time = pygame.time.get_ticks()
         
         if power_up_type == 'large_blast':
             # Increase bullet size
-            self.settings.bullet_width *= self.settings.power_up_types['large_blast']['width_multiplier']
-            self.settings.bullet_height *= self.settings.power_up_types['large_blast']['height_multiplier']
+            self.settings.bullet_width = int(self.settings.original_bullet_width * 
+                                          self.settings.power_up_types['large_blast']['width_multiplier'])
+            self.settings.bullet_height = int(self.settings.original_bullet_height * 
+                                           self.settings.power_up_types['large_blast']['height_multiplier'])
+            # Play power-up sound
+            self.sounds.play_level_up()
+            
         elif power_up_type == 'auto_fire':
-            # Auto-fire will be handled in _handle_auto_fire
-            pass
+            # Enable auto-fire
+            self.settings.auto_fire = True
+            self.settings.last_fire_time = pygame.time.get_ticks()
+            # Play power-up sound
+            self.sounds.play_level_up()
+            
         elif power_up_type == 'ally_help':
+            print("Activating ally help power-up")
             self.settings.ally_active = True
+            # Create ally ship if it doesn't exist
+            if not self.ally_ship:
+                print("Creating new ally ship")
+                self.ally_ship = AllyShip(self)
+            # Initialize ally fire time
+            self.settings.last_ally_fire_time = pygame.time.get_ticks()
             # Start firing ally bullets
             self._fire_ally_bullet()
+            # Play power-up sound
+            self.sounds.play_level_up()
             
     def _check_power_up_timers(self):
         """Check if power-ups have expired."""
@@ -359,33 +396,32 @@ class AlienInvasion:
                     
     def _deactivate_power_up(self):
         """Deactivate power-up effects."""
+        print(f"Deactivating power-up: {self.settings.power_up_type}")
         if self.settings.power_up_type == 'large_blast':
-            # Reset bullet size
-            self.settings.bullet_width = 8
-            self.settings.bullet_height = 25
+            # Reset bullet size to original dimensions
+            self.settings.bullet_width = self.settings.original_bullet_width
+            self.settings.bullet_height = self.settings.original_bullet_height
+            
         elif self.settings.power_up_type == 'auto_fire':
-            # Auto-fire will stop automatically
-            pass
+            # Disable auto-fire
+            self.settings.auto_fire = False
+            
+        elif self.settings.power_up_type == 'ally_help':
+            # Deactivate ally but don't remove the ship
+            self.settings.ally_active = False
+            print("Deactivating ally help")
             
         self.settings.power_up_active = False
         self.settings.power_up_type = None
         
     def _handle_auto_fire(self):
-        """Handle automatic firing for both player and ally."""
-        # Player auto-fire
+        """Handle automatic firing for player only (no ally auto-fire)."""
         if self.settings.auto_fire and self.stats.game_active:
             current_time = pygame.time.get_ticks()
-            if current_time - self.settings.last_fire_time >= self.settings.fire_delay:
+            if current_time - self.settings.last_fire_time >= self.settings.power_up_types['auto_fire']['fire_delay']:
                 self._fire_bullet()
                 self.settings.last_fire_time = current_time
-                
-        # Ally auto-fire
-        if self.ally_ship and self.stats.game_active:
-            current_time = pygame.time.get_ticks()
-            if current_time - self.settings.last_ally_fire_time >= self.settings.ally_fire_delay:
-                self._fire_ally_bullet()
-                self.settings.last_ally_fire_time = current_time
-                
+
     def _update_ally(self):
         """Update ally position and firing."""
         if self.settings.ally_active:
@@ -411,6 +447,7 @@ class AlienInvasion:
     def _fire_ally_bullet(self):
         """Create a new bullet and add it to the ally bullets group."""
         if self.ally_ship and len(self.ally_bullets) < self.settings.bullets_allowed:
+            print("Creating ally bullet")
             new_bullet = Bullet(self, self.ally_ship)
             self.ally_bullets.add(new_bullet)
             self.sounds.play_laser()
@@ -493,6 +530,57 @@ class AlienInvasion:
                 # Reset alien to top of screen instead of losing a life
                 alien._reset_to_top()
                 break
+
+    def _reset_game(self):
+        """Reset the game to initial state."""
+        # Reset game statistics
+        self.stats.reset_stats()
+        self.sb.prep_score()
+        self.sb.prep_level()
+        self.sb.prep_power_level()
+        self.sb.prep_ships()
+        
+        # Reset game settings
+        self.settings = Settings()  # Create new settings instance
+        
+        # Clear all game objects
+        self.aliens.empty()
+        self.bullets.empty()
+        self.ally_bullets.empty()
+        self.power_ups.empty()
+        self.explosions.empty()
+        self.stars.empty()
+        
+        # Reset ship and ally
+        self.ship.center_ship()
+        self.ally_ship = None
+        
+        # Reset power-up and ally flags
+        self.settings.power_up_spawned = False
+        self.settings.ally_spawned = False
+        self.settings.power_up_active = False
+        self.settings.power_up_type = None
+        self.settings.ally_active = False
+        
+        # Reset power-up thresholds
+        self.settings.power_up_threshold = 500
+        self.settings.ally_threshold = 1000
+        
+        # Reset bullet settings
+        self.settings.bullet_width = 8
+        self.settings.bullet_height = 25
+        
+        # Create new fleet and stars
+        self._create_fleet()
+        self._create_stars()
+        
+        # Start the game
+        self.stats.game_active = True
+        pygame.mouse.set_visible(False)
+        
+        # Restart background music
+        self.sounds.stop_background_music()
+        self.sounds.play_background_music()
 
 if __name__ == '__main__':
     #Make a game instance, and run the game.

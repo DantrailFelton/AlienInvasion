@@ -13,9 +13,8 @@ class PowerUp(Sprite):
         self.settings = ai_game.settings
         self.screen_rect = self.screen.get_rect()
         
-        # Load the power-up image and set its rect attribute.
-        self.image = pygame.Surface((20, 20))
-        self.image.fill((255, 215, 0))  # Gold color
+        # Create a larger surface for the power-up
+        self.image = pygame.Surface((30, 30), pygame.SRCALPHA)
         self.rect = self.image.get_rect()
         
         # Start each new power-up at a random position at the top of the screen.
@@ -30,17 +29,29 @@ class PowerUp(Sprite):
         self.type = random.choice(self.types)
         
         # Set color based on type
-        if self.type == 'large_blast':
-            self.image.fill((255, 0, 0))  # Red for large blast
-        elif self.type == 'auto_fire':
-            self.image.fill((0, 255, 0))  # Green for auto fire
-        else:  # ally_help
-            self.image.fill((0, 0, 255))  # Blue for ally help
-            
+        self.color = self.settings.power_up_types[self.type]['color']
+        
+        # Draw the power-up based on its type
+        self._draw_power_up()
+        
+        # Add glow effect
+        self.glow_radius = 0
+        self.glow_growing = True
+        
     def update(self):
         """Move the power-up down the screen."""
         self.y += self.settings.power_up_speed
         self.rect.y = self.y
+        
+        # Update glow effect
+        if self.glow_growing:
+            self.glow_radius += 0.2
+            if self.glow_radius >= 5:
+                self.glow_growing = False
+        else:
+            self.glow_radius -= 0.2
+            if self.glow_radius <= 0:
+                self.glow_growing = True
         
         # Remove power-up if it goes off screen
         if self.rect.top > self.screen_rect.bottom:
@@ -48,37 +59,62 @@ class PowerUp(Sprite):
         
     def draw_power_up(self):
         """Draw the power-up to the screen."""
-        pygame.draw.rect(self.screen, (255, 255, 255), self.rect, 2)
-        self.screen.blit(self.image, self.rect.topleft)
+        # Draw glow effect
+        glow_surface = pygame.Surface((self.rect.width + 20, self.rect.height + 20), pygame.SRCALPHA)
+        glow_color = (*self.color, 100)  # Semi-transparent version of power-up color
+        pygame.draw.circle(glow_surface, glow_color, 
+                         (self.rect.width//2 + 10, self.rect.height//2 + 10),
+                         int(self.glow_radius + 10))
+        self.screen.blit(glow_surface, 
+                        (self.rect.x - 10, self.rect.y - 10))
+        
+        # Draw the power-up
+        self.screen.blit(self.image, self.rect)
         
     def _draw_power_up(self):
         """Draw the power-up on its image surface."""
-        if self.type == 'star':
-            self._draw_star()
-        elif self.type == 'circle':
-            pygame.draw.circle(self.image, self.color, (15, 15), 15)
-        elif self.type == 'square':
-            pygame.draw.rect(self.image, self.color, self.image.get_rect())
-        else:  # bean
-            self._draw_bean()
+        if self.type == 'large_blast':
+            self._draw_ki_blast()
+        elif self.type == 'auto_fire':
+            self._draw_auto_fire()
+        else:  # ally_help
+            self._draw_ally_help()
             
-        # Draw a border
-        pygame.draw.rect(self.image, (255, 255, 255), self.image.get_rect(), 2)
-        
-    def _draw_star(self):
-        """Draw a star shape for the large blast power-up."""
-        points = []
-        center = (15, 15)
-        outer_radius = 15
-        inner_radius = 7
-        for i in range(10):
-            angle = math.pi / 5 * i
-            radius = outer_radius if i % 2 == 0 else inner_radius
-            x = center[0] + math.cos(angle) * radius
-            y = center[1] + math.sin(angle) * radius
-            points.append((x, y))
-        pygame.draw.polygon(self.image, self.color, points)
-        
-    def _draw_bean(self):
-        """Draw a bean shape for the senzu bean power-up."""
-        pygame.draw.ellipse(self.image, self.color, (0, 5, 30, 20)) 
+    def _draw_ki_blast(self):
+        """Draw a ki blast shape for the large blast power-up."""
+        # Draw outer circle
+        pygame.draw.circle(self.image, self.color, (15, 15), 12)
+        # Draw inner circle
+        pygame.draw.circle(self.image, (255, 255, 255), (15, 15), 6)
+        # Draw energy lines
+        for i in range(8):
+            angle = math.pi / 4 * i
+            start_pos = (15 + math.cos(angle) * 6, 15 + math.sin(angle) * 6)
+            end_pos = (15 + math.cos(angle) * 12, 15 + math.sin(angle) * 12)
+            pygame.draw.line(self.image, (255, 255, 255), start_pos, end_pos, 2)
+            
+    def _draw_auto_fire(self):
+        """Draw an auto-fire symbol."""
+        # Draw circular base
+        pygame.draw.circle(self.image, self.color, (15, 15), 12)
+        # Draw three bullets
+        for i in range(3):
+            angle = math.pi / 3 * i
+            x = 15 + math.cos(angle) * 8
+            y = 15 + math.sin(angle) * 8
+            pygame.draw.circle(self.image, (255, 255, 255), (int(x), int(y)), 3)
+            
+    def _draw_ally_help(self):
+        """Draw an ally help symbol."""
+        # Draw circular base
+        pygame.draw.circle(self.image, self.color, (15, 15), 12)
+        # Draw Vegeta's symbol (simplified)
+        points = [
+            (15, 8),  # Top
+            (20, 15),  # Right
+            (15, 22),  # Bottom
+            (10, 15)   # Left
+        ]
+        pygame.draw.polygon(self.image, (255, 255, 255), points)
+        # Draw inner circle
+        pygame.draw.circle(self.image, (255, 255, 255), (15, 15), 4) 

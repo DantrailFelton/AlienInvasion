@@ -1,4 +1,5 @@
 from ship import Ship
+import pygame
 
 class AllyShip(Ship):
     """A class to represent the ally ship that mirrors the player's ship."""
@@ -7,10 +8,18 @@ class AllyShip(Ship):
         """Initialize the ally ship and set its starting position."""
         super().__init__(ai_game)
         self.ai_game = ai_game  # Store reference to main game
+        
+        # Load Vegeta's ship image
+        self.image = pygame.image.load('images/vegeta_ship.bmp')
+        self.rect = self.image.get_rect()
+        
         # Position the ally ship to the right of the player's ship
-        self.rect.midleft = (self.screen_rect.right - 60, self.screen_rect.bottom - 60)
+        self.rect.midbottom = (self.screen_rect.right - 60, self.screen_rect.bottom - 60)
         self.x = float(self.rect.x)
         
+        # Ally hit points
+        self.hit_points = 3
+    
     def update(self):
         """Update the ally ship's position based on the player's ship."""
         # Mirror the player's ship movement
@@ -27,4 +36,27 @@ class AllyShip(Ship):
             self.x = float(self.rect.x)
         if self.rect.right > self.screen_rect.right:
             self.rect.right = self.screen_rect.right
-            self.x = float(self.rect.x) 
+            self.x = float(self.rect.x)
+    
+    def take_hit(self):
+        """Reduce hit points by 1. Return True if destroyed."""
+        self.hit_points -= 1
+        if self.hit_points <= 0:
+            return True
+        return False
+
+    def blitme(self):
+        """Draw the ally ship at its current location and show health bar."""
+        self.screen.blit(self.image, self.rect)
+        # Draw health bar above the ally ship
+        bar_width = 40
+        bar_height = 6
+        bar_x = self.rect.centerx - bar_width // 2
+        bar_y = self.rect.top - 12
+        # Background (gray)
+        pygame.draw.rect(self.screen, (80, 80, 80), (bar_x, bar_y, bar_width, bar_height))
+        # Health (green)
+        health_width = int(bar_width * (self.hit_points / 3))
+        pygame.draw.rect(self.screen, (0, 255, 0), (bar_x, bar_y, health_width, bar_height))
+        # Border
+        pygame.draw.rect(self.screen, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 1) 

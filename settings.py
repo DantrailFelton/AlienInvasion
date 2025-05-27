@@ -9,25 +9,25 @@ class Settings:
         self.bg_color = (0, 0, 0)
 
         # Ship settings
-        self.ship_speed = 0.5  # Reduced from 1.5 for smoother movement
+        self.ship_speed = 0.3  # Reduced base speed
         self.ship_limit = 3
 
         # Bullet settings
-        self.bullet_speed = 2.0  # Slightly reduced from 2.5 to match slower pace
+        self.bullet_speed = 1.5  # Reduced bullet speed
         self.bullet_width = 8
         self.bullet_height = 25
         self.bullet_color = (0, 191, 255)  # Bright blue color
         self.bullets_allowed = 3
 
         # Alien settings
-        self.alien_speed = 0.1  # Much slower base speed for beginning levels
-        self.fleet_drop_speed = 3  # Reduced drop speed
+        self.alien_speed = 0.05  # Reduced base alien speed
+        self.fleet_drop_speed = 2  # Reduced drop speed
         # fleet_direction of 1 represents right; -1 represents left.
         self.fleet_direction = 1
 
         # Star settings
-        self.star_count = 100  # Number of stars in the background
-        self.star_speed = 0.5  # Speed of star movement
+        self.star_count = 100
+        self.star_speed = 0.3  # Reduced star speed
 
         # Transformation settings
         self.transformation_power_levels = {
@@ -38,9 +38,9 @@ class Settings:
         }
         self.transformation_speed_multipliers = {
             'base': 1.0,
-            'ssj': 1.3,
-            'ssj2': 1.6,
-            'ssj3': 1.9
+            'ssj': 1.2,    # Reduced speed multiplier
+            'ssj2': 1.4,   # Reduced speed multiplier
+            'ssj3': 1.6    # Reduced speed multiplier
         }
         self.transformation_bullet_multipliers = {
             'base': 1.0,
@@ -49,49 +49,49 @@ class Settings:
             'ssj3': 1.6
         }
 
-        # How quickly the game speeds up
-        self.speedup_scale = 1.1
+        # How quickly the game speeds up (reduced scaling)
+        self.speedup_scale = 1.05
         # How quickly the alien point values increase
         self.score_scale = 1.5
 
         # Power-up settings
-        self.power_up_speed = 0.5
+        self.power_up_speed = 0.3
         self.power_up_types = {
             'large_blast': {
+                'width_multiplier': 2.0,  # Increased for more dramatic effect
+                'height_multiplier': 2.0,
                 'duration': 10000,  # 10 seconds
-                'width_multiplier': 2.0,
-                'height_multiplier': 2.0
+                'color': (255, 0, 0)  # Red
             },
             'auto_fire': {
                 'duration': 8000,  # 8 seconds
-                'fire_rate': 200  # milliseconds between shots
+                'fire_delay': 200,  # 200ms between shots
+                'color': (0, 255, 0)  # Green
             },
             'ally_help': {
                 'duration': 15000,  # 15 seconds
-                'fire_rate': 500  # milliseconds between shots
+                'color': (0, 0, 255)  # Blue
             }
         }
         self.power_up_active = False
         self.power_up_type = None
         self.power_up_start_time = 0
-        self.ally_active = False
-        self.ally_last_shot = 0
-        
-        # Point thresholds for power-ups and allies
-        self.power_up_threshold = 500
-        self.ally_threshold = 1000
         self.power_up_spawned = False
-        self.ally_spawned = False
-
-        # Ally settings
-        self.ally_threshold = 1000  # Score needed to spawn ally
-        self.ally_fire_delay = 1000  # Time between ally shots in milliseconds
+        self.power_up_threshold = 500
+        self.auto_fire = False  # Track auto-fire state
+        self.last_fire_time = 0  # Track last auto-fire time
         self.last_ally_fire_time = 0  # Track last ally fire time
-        
-        # Auto-fire settings
-        self.auto_fire = False  # Whether auto-fire is active
-        self.fire_delay = 200  # Time between auto-fire shots in milliseconds
-        self.last_fire_time = 0  # Track last fire time
+        self.ally_active = False
+        self.ally_spawned = False
+        self.ally_threshold = 1000
+        self.ally_fire_delay = 1000  # 1 second between ally shots
+
+        # Store original bullet dimensions for reset
+        self.original_bullet_width = 8
+        self.original_bullet_height = 25
+
+        # Initialize alien points
+        self.alien_points = 50
 
         self.initialize_dynamic_settings()
 
@@ -104,14 +104,17 @@ class Settings:
         # fleet_direction of 1 represents right; -1 represents left.
         self.fleet_direction = 1
 
-        # Scoring
-        self.alien_points = 50
-
     def increase_speed(self):
         """Increase speed settings and alien point values."""
+        # More gradual speed increases
         self.ship_speed *= self.speedup_scale
         self.bullet_speed *= self.speedup_scale
         self.alien_speed *= self.speedup_scale
+
+        # Cap maximum speeds
+        self.ship_speed = min(self.ship_speed, 0.6)  # Cap ship speed
+        self.bullet_speed = min(self.bullet_speed, 2.5)  # Cap bullet speed
+        self.alien_speed = min(self.alien_speed, 0.2)  # Cap alien speed
 
         self.alien_points = int(self.alien_points * self.score_scale)
 
